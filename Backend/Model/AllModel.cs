@@ -53,6 +53,7 @@ namespace Backend.Model
         public string FullName { get; set; }
         public string Email { get; set; }
         public string PhoneNumber { get; set; }
+        public string Code { get; set; }
         public DateTime? DateOfBirth { get; set; }
         public decimal Balance { get; set; } // Số dư tài khoản
         public UserRole Role { get; set; }
@@ -130,10 +131,22 @@ namespace Backend.Model
     public class ChargingSession
     {
         public int Id { get; set; }
+
+        // THÊM DÒNG NÀY: ID phiên sạc từ giao thức OCPP - Rất quan trọng!
+        public int OcppTransactionId { get; set; }
+
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
-        public decimal EnergyConsumedKWh { get; set; } // Năng lượng tiêu thụ
-        public decimal TotalCost { get; set; } // Tổng chi phí
+        public decimal EnergyConsumedKWh { get; set; }
+        public decimal TotalCost { get; set; }
+
+        // THÊM DÒNG NÀY: Lý do dừng sạc từ trạm
+        public string? StopReason { get; set; }
+
+        // THÊM CÁC DÒNG NÀY: % pin lúc bắt đầu và kết thúc (nếu có)
+        public decimal? InitialSoC { get; set; }
+        public decimal? FinalSoC { get; set; }
+
 
         public int UserId { get; set; }
         public virtual User User { get; set; }
@@ -141,14 +154,24 @@ namespace Backend.Model
         public int ConnectorId { get; set; }
         public virtual Connector Connector { get; set; }
 
-        // Thông tin thanh toán
+        // THÊM DÒNG NÀY: Thẻ hoặc phương thức dùng để xác thực
+        public string AuthorizationIdTag { get; set; }
+
+        // --- Thông tin thanh toán ---
         public string PaymentMethod { get; set; }
         public PaymentStatus PaymentStatus { get; set; }
-        public string TransactionId { get; set; } // ID giao dịch từ cổng thanh toán
 
-        public int? VoucherId { get; set; } // Voucher có thể có hoặc không
+        // SỬA DÒNG NÀY: Đổi tên từ 'TransactionId' để rõ ràng hơn
+        public string? PaymentGatewayTransactionId { get; set; }
+
+
+        public int? VoucherId { get; set; }
         public virtual Voucher? Voucher { get; set; }
     }
+
+
+
+
 
     /// <summary>
     /// Đặt trước một cổng sạc tại một trạm.

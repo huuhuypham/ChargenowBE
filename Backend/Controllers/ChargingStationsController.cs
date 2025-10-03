@@ -130,12 +130,13 @@ namespace Backend.Controllers
             List<ConnectorInfo> connectorInfos;
             try
             {
-            {
-                // Deserialize chuỗi JSON của connectors
-                connectorInfos = JsonSerializer.Deserialize<List<ConnectorInfo>>(
-                    stationDto.Connectors,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                );
+                {
+                    // Deserialize chuỗi JSON của connectors
+                    connectorInfos = JsonSerializer.Deserialize<List<ConnectorInfo>>(
+                        stationDto.Connectors,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+                }
             }
             catch (JsonException)
             {

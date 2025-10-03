@@ -1,5 +1,6 @@
 ﻿using Backend.Data;
 using Backend.DTOs;
+using Backend.Model; // Thêm using để nhận diện Enum ApprovalStatus
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -19,14 +20,28 @@ namespace Backend.Controllers
             _context = context;
         }
 
+        // === ĐÃ SỬA: Lấy thống kê cho người dùng (ID=2) VÀ trạm đã được duyệt ===
         [HttpGet("global")]
         public async Task<IActionResult> GetGlobalStats()
         {
-            var totalRevenue = await _context.ChargingSessions.SumAsync(s => s.TotalCost);
-            var totalEnergy = await _context.ChargingSessions.SumAsync(s => s.EnergyConsumedKWh);
-            var totalSessions = await _context.ChargingSessions.CountAsync();
-            var totalStations = await _context.ChargingStations.CountAsync();
-            var totalUsers = await _context.Users.CountAsync();
+            var ownerId = 1;
+
+            var userStationsQuery = _context.ChargingStations
+                .Where(s => s.OwnerId == ownerId && s.ApprovalStatus == ApprovalStatus.Approved);
+
+            var totalRevenue = await _context.ChargingSessions
+                .Where(s => s.Connector.ChargingStation.OwnerId == ownerId && s.Connector.ChargingStation.ApprovalStatus == ApprovalStatus.Approved)
+                .SumAsync(s => s.TotalCost);
+
+            var totalEnergy = await _context.ChargingSessions
+                .Where(s => s.Connector.ChargingStation.OwnerId == ownerId && s.Connector.ChargingStation.ApprovalStatus == ApprovalStatus.Approved)
+                .SumAsync(s => s.EnergyConsumedKWh);
+
+            var totalSessions = await _context.ChargingSessions
+                .Where(s => s.Connector.ChargingStation.OwnerId == ownerId && s.Connector.ChargingStation.ApprovalStatus == ApprovalStatus.Approved)
+                .CountAsync();
+
+            var totalStations = await userStationsQuery.CountAsync();
 
             var stats = new GlobalStatsDto
             {
@@ -34,51 +49,53 @@ namespace Backend.Controllers
                 TotalEnergyConsumedKWh = totalEnergy,
                 TotalChargingSessions = totalSessions,
                 TotalStations = totalStations,
-                TotalUsers = totalUsers
             };
 
             return Ok(stats);
         }
 
-        // === PHẦN ĐÃ ĐƯỢC SỬA LỖI ===
+        // === ĐÃ SỬA: Lấy doanh thu của người dùng (ID=2) VÀ trạm đã được duyệt ===
         [HttpGet("revenue-over-time")]
         public async Task<IActionResult> GetRevenueOverTime([FromQuery] int days = 30)
         {
+            var ownerId = 1;
             var startDate = DateTime.UtcNow.Date.AddDays(-days);
 
-            // 1. Lấy dữ liệu thô từ database, giữ nguyên kiểu DateTime
             var revenueDataRaw = await _context.ChargingSessions
-                .Where(s => s.StartTime.Date >= startDate)
+                .Where(s => s.Connector.ChargingStation.OwnerId == ownerId
+                            && s.Connector.ChargingStation.ApprovalStatus == ApprovalStatus.Approved // Thêm điều kiện lọc trạng thái
+                            && s.StartTime.Date >= startDate)
                 .GroupBy(s => s.StartTime.Date)
                 .Select(g => new
                 {
-                    Date = g.Key, // Giữ nguyên là DateTime
+                    Date = g.Key,
                     Value = g.Sum(s => s.TotalCost)
                 })
                 .OrderBy(d => d.Date)
-                .ToListAsync(); // <-- Thực thi câu lệnh SQL ở đây
+                .ToListAsync();
 
-            // 2. Định dạng lại ngày tháng trong bộ nhớ của ứng dụng
             var formattedData = revenueDataRaw.Select(d => new TimeSeriesDataPointDto
             {
-                Date = d.Date.ToString("yyyy-MM-dd"), // Thao tác này giờ an toàn
+                Date = d.Date.ToString("yyyy-MM-dd"),
                 Value = d.Value
             }).ToList();
 
             return Ok(formattedData);
         }
 
+        // === ĐÃ SỬA: Lấy top trạm sạc đã được duyệt trên toàn hệ thống ===
         [HttpGet("top-stations")]
         public async Task<IActionResult> GetTopStationsByRevenue([FromQuery] int count = 5)
         {
             var topStations = await _context.ChargingSessions
+                .Where(s => s.Connector.ChargingStation.ApprovalStatus == ApprovalStatus.Approved) // Thêm điều kiện lọc trạng thái
                 .GroupBy(s => new {
                     s.Connector.ChargingStation.Id,
                     s.Connector.ChargingStation.Name
                 })
                 .Select(g => new StationUsageDto
                 {
-                    StationId = g.Key.Id,
+                    StationId = 1,
                     StationName = g.Key.Name,
                     SessionCount = g.Count(),
                     TotalRevenue = g.Sum(s => s.TotalCost),
